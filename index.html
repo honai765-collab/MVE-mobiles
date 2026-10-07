@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<title>Mobile Shop Inventory</title>
+<style>
+:root{--bg:#f3f4f6;--card:#fff;--text:#111827;--muted:#6b7280;--accent:#111827;--danger:#dc2626;--ok:#15803d}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+header{background:#111827;color:#fff;padding:18px 16px;position:sticky;top:0;z-index:10}
+header h1{font-size:20px;margin:0 0 4px}header p{margin:0;color:#d1d5db;font-size:13px}
+main{max-width:760px;margin:auto;padding:14px 14px 90px}.tabs{display:flex;gap:8px;overflow:auto;margin-bottom:14px}
+.tab{border:0;background:#e5e7eb;border-radius:10px;padding:11px 14px;font-weight:600;white-space:nowrap}.tab.active{background:#111827;color:#fff}
+.card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 1px 4px #00000012}
+h2{font-size:18px;margin:0 0 14px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label{font-size:13px;font-weight:600;display:block;margin-bottom:6px}input,select,textarea{width:100%;border:1px solid #d1d5db;border-radius:10px;padding:12px;font-size:16px;background:#fff}textarea{min-height:100px;resize:vertical}
+.full{grid-column:1/-1}.btn{border:0;border-radius:11px;padding:12px 15px;font-size:15px;font-weight:700;background:#111827;color:#fff;cursor:pointer}.btn.secondary{background:#e5e7eb;color:#111827}.btn.danger{background:#fee2e2;color:#991b1b}.btn.ok{background:#15803d}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.search{margin-bottom:12px}.item{border:1px solid #e5e7eb;border-radius:12px;padding:13px;margin:8px 0;background:#fff}.item strong{font-size:16px}.meta{color:var(--muted);font-size:13px;margin-top:4px}.price{font-weight:800;margin-top:8px}.profit{color:var(--ok);font-weight:800}.code{font-family:monospace;font-size:18px;font-weight:800;letter-spacing:.5px}
+#reader{width:100%;max-width:500px;margin:auto}.hidden{display:none!important}.empty{color:var(--muted);text-align:center;padding:25px}
+.modal{position:fixed;inset:0;background:#0008;display:flex;align-items:flex-end;justify-content:center;z-index:50}.modalbox{background:#fff;width:100%;max-width:760px;max-height:92vh;overflow:auto;border-radius:20px 20px 0 0;padding:18px}
+.detailrow{display:flex;justify-content:space-between;gap:15px;padding:10px 0;border-bottom:1px solid #eee}.detailrow span:first-child{color:var(--muted)}
+#qr{display:flex;justify-content:center;margin:12px 0}
+.small{font-size:12px;color:var(--muted)}.notice{background:#eff6ff;border-radius:10px;padding:12px;font-size:13px;margin-bottom:12px}
+@media(max-width:520px){.grid{grid-template-columns:1fr}.full{grid-column:auto}}
+</style>
+</head>
+<body>
+<header><h1>Mobile Shop Inventory</h1><p>Stock • Purchase price • QR codes • Repair notes</p></header>
+<main>
+<div class="tabs">
+<button class="tab active" data-tab="inventory">Inventory</button>
+<button class="tab" data-tab="add">Add Phone</button>
+<button class="tab" data-tab="scan">Scan QR</button>
+</div>
+
+<section id="inventory">
+<div class="card">
+<input class="search" id="search" placeholder="Search model, IMEI, code, supplier...">
+<div id="inventoryList"></div>
+</div>
+</section>
+
+<section id="add" class="hidden">
+<div class="card">
+<h2>Add phone to stock</h2>
+<div class="grid">
+<div><label>Brand</label><input id="brand" placeholder="Apple"></div>
+<div><label>Model</label><input id="model" placeholder="iPhone 15 Pro"></div>
+<div><label>Storage</label><input id="storage" placeholder="256GB"></div>
+<div><label>Colour</label><input id="colour" placeholder="Black"></div>
+<div class="full"><label>IMEI / Serial number</label><input id="imei" inputmode="numeric" placeholder="Optional"></div>
+<div><label>Purchase price (£)</label><input id="purchase" type="number" min="0" step="0.01" placeholder="400"></div>
+<div><label>Purchase date</label><input id="date" type="date"></div>
+<div><label>Condition</label><select id="condition"><option>New</option><option>Excellent</option><option>Good</option><option>Fair</option><option>Used</option><option>For parts</option></select></div>
+<div><label>Supplier / seller</label><input id="supplier" placeholder="Optional"></div>
+<div class="full"><label>Repair / notes</label><textarea id="notes" placeholder="Describe anything repaired or replaced before sale, faults, battery replacement, screen replacement, back glass repair, etc."></textarea></div>
+</div>
+<div class="actions"><button class="btn" onclick="addPhone()">Save & Generate QR</button><button class="btn secondary" onclick="clearForm()">Clear</button></div>
+</div>
+</section>
+
+<section id="scan" class="hidden">
+<div class="card">
+<h2>Scan phone QR code</h2>
+<div class="notice">Allow camera access, then point the camera at the QR label. If scanning is unavailable, enter the code manually below.</div>
+<div id="reader"></div>
+<div class="actions"><button class="btn" id="startScan" onclick="startScanner()">Start camera</button><button class="btn secondary" onclick="stopScanner()">Stop</button></div>
+<hr style="border:0;border-top:1px solid #eee;margin:18px 0">
+<label>Enter code manually</label>
+<input id="manualCode" placeholder="e.g. MVE-000001">
+<div class="actions"><button class="btn" onclick="lookupManual()">Find phone</button></div>
+</div>
+</section>
+</main>
+
+<div id="modal" class="modal hidden" onclick="if(event.target===this)closeModal()">
+<div class="modalbox" id="modalContent"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+const KEY='mve_inventory_v1';
+let inventory=JSON.parse(localStorage.getItem(KEY)||'[]');
+let scanner=null;
+
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+document.getElementById('search').oninput=renderInventory;
+document.getElementById('date').value=new Date().toISOString().slice(0,10);
+
+function showTab(tab){
+ document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+ ['inventory','add','scan'].forEach(x=>document.getElementById(x).classList.toggle('hidden',x!==tab));
+ if(tab==='inventory')renderInventory();
+}
+function save(){localStorage.setItem(KEY,JSON.stringify(inventory));}
+function nextCode(){
+ let n=inventory.reduce((m,x)=>Math.max(m,parseInt((x.code||'').replace('MVE-',''))||0),0)+1;
+ return 'MVE-'+String(n).padStart(6,'0');
+}
+function addPhone(){
+ const brand=v('brand'),model=v('model'),purchase=parseFloat(v('purchase'));
+ if(!brand||!model||isNaN(purchase)){alert('Please enter at least the brand, model and purchase price.');return}
+ const phone={id:crypto.randomUUID?crypto.randomUUID():Date.now().toString(),code:nextCode(),brand,model,storage:v('storage'),colour:v('colour'),imei:v('imei'),purchase, date:v('date')||new Date().toISOString().slice(0,10),condition:v('condition'),supplier:v('supplier'),notes:v('notes'),sold:false,salePrice:null,soldDate:null};
+ inventory.push(phone);save();clearForm();showTab('inventory');openPhone(phone.code);
+}
+function clearForm(){['brand','model','storage','colour','imei','purchase','supplier','notes'].forEach(id=>document.getElementById(id).value='');document.getElementById('date').value=new Date().toISOString().slice(0,10);}
+function v(id){return document.getElementById(id).value.trim()}
+function renderInventory(){
+ const q=v('search').toLowerCase();
+ const list=inventory.filter(x=>JSON.stringify(x).toLowerCase().includes(q));
+ const el=document.getElementById('inventoryList');
+ if(!list.length){el.innerHTML='<div class="empty">No phones found.</div>';return}
+ el.innerHTML=list.slice().reverse().map(x=>`<div class="item" onclick="openPhone('${x.code}')">
+ <strong>${esc(x.brand)} ${esc(x.model)} ${esc(x.storage)}</strong>
+ <div class="meta">${esc(x.condition)} · ${x.sold?'SOLD':'IN STOCK'}</div>
+ <div class="meta code">${esc(x.code)}</div>
+ <div class="price">Bought: £${money(x.purchase)} ${x.sold&&x.salePrice!=null?` · Sold: £${money(x.salePrice)} · <span class="profit">Profit: £${money(x.salePrice-x.purchase)}</span>`:''}</div>
+ </div>`).join('');
+}
+function openPhone(code){
+ const x=inventory.find(p=>p.code===code);if(!x)return;
+ document.getElementById('modalContent').innerHTML=`
+ <button class="btn secondary" onclick="closeModal()">Close</button>
+ <h2 style="margin-top:16px">${esc(x.brand)} ${esc(x.model)}</h2>
+ <div class="detailrow"><span>Stock code</span><b class="code">${esc(x.code)}</b></div>
+ <div class="detailrow"><span>Purchase price</span><b>£${money(x.purchase)}</b></div>
+ <div class="detailrow"><span>Purchase date</span><b>${esc(x.date)}</b></div>
+ <div class="detailrow"><span>IMEI / Serial</span><b>${esc(x.imei||'—')}</b></div>
+ <div class="detailrow"><span>Storage / Colour</span><b>${esc(x.storage||'—')} / ${esc(x.colour||'—')}</b></div>
+ <div class="detailrow"><span>Condition</span><b>${esc(x.condition)}</b></div>
+ <div class="detailrow"><span>Supplier</span><b>${esc(x.supplier||'—')}</b></div>
+ ${x.sold?`<div class="detailrow"><span>Sold price</span><b>£${money(x.salePrice)}</b></div><div class="detailrow"><span>Profit</span><b class="profit">£${money(x.salePrice-x.purchase)}</b></div>`:''}
+ <h3>Repair / notes</h3><div style="white-space:pre-wrap;background:#f9fafb;padding:12px;border-radius:10px">${esc(x.notes||'No notes')}</div>
+ <h3>QR code</h3><div id="qr"></div><div class="small" style="text-align:center">Print this QR label and attach it to the phone.</div>
+ <div class="actions">
+ <button class="btn" onclick="printQR('${x.code}')">Print QR label</button>
+ ${!x.sold?`<button class="btn ok" onclick="sellPhone('${x.code}')">Mark as sold</button>`:''}
+ <button class="btn danger" onclick="deletePhone('${x.code}')">Delete</button>
+ </div>`;
+ document.getElementById('modal').classList.remove('hidden');
+ new QRCode(document.getElementById('qr'),{text:x.code,width:190,height:190,correctLevel:QRCode.CorrectLevel.M});
+}
+function closeModal(){document.getElementById('modal').classList.add('hidden')}
+function sellPhone(code){
+ const x=inventory.find(p=>p.code===code);if(!x)return;
+ const price=prompt('Selling price (£):');if(price===null)return;
+ const p=parseFloat(price);if(isNaN(p)){alert('Invalid price');return}
+ x.sold=true;x.salePrice=p;x.soldDate=new Date().toISOString().slice(0,10);save();closeModal();renderInventory();openPhone(code);
+}
+function deletePhone(code){if(!confirm('Delete this phone record?'))return;inventory=inventory.filter(x=>x.code!==code);save();closeModal();renderInventory();}
+function printQR(code){
+ const x=inventory.find(p=>p.code===code); if(!x)return;
+ const w=window.open('','_blank','width=450,height=550');
+ w.document.write(`<html><head><title>${code}</title><style>body{font-family:Arial;text-align:center;padding:25px}#q{display:flex;justify-content:center;margin:15px}h2{margin-bottom:5px}</style></head><body><h2>${esc(x.brand)} ${esc(x.model)}</h2><div>${esc(x.storage||'')}</div><div id="q"></div><h3>${code}</h3><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script><script>new QRCode(document.getElementById('q'),{text:'${code}',width:220,height:220});setTimeout(()=>window.print(),500)<\/script></body></html>`);w.document.close();
+}
+function startScanner(){
+ if(!window.Html5Qrcode){alert('Scanner library could not load. Use manual code or reconnect to the internet once.');return}
+ if(scanner)return;
+ scanner=new Html5Qrcode("reader");
+ scanner.start({facingMode:"environment"},{fps:10,qrbox:{width:250,height:250}},text=>{stopScanner();openPhone(text.trim())},()=>{}).catch(e=>{scanner=null;alert('Camera could not start. Check camera permission and try again.');});
+}
+function stopScanner(){if(scanner){scanner.stop().catch(()=>{});scanner.clear();scanner=null}}
+function lookupManual(){const c=v('manualCode');if(!inventory.some(x=>x.code===c)){alert('No phone found with that code.');return}openPhone(c)}
+function money(n){return Number(n).toFixed(2)}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+renderInventory();
+</script>
+</body>
+</html>
